@@ -1,0 +1,48 @@
+# Build outputs
+build/
+target/
+*.bytecode
+*.abi
+
+# Private keys and sensitive data
+key.txt
+*.key
+*.pem
+*.secret
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Sui specific
+.move/
+.sui/
+sui.log.*
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp 

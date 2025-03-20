@@ -1,0 +1,22 @@
+[package]
+name = "keyless"
+version = "1.0.0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet" }
+MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "mainnet" }
+
+[addresses]
+keyless = "0x0"
+std = "0x1"
+sui = "0x2"
+
+[test-dependencies]
+Sui = { local = "../sui/crates/sui-framework/packages/sui-framework" }
+MoveStdlib = { local = "../sui/crates/sui-framework/packages/move-stdlib" }
+
+[test-only]
+test = false
+
+[compiler-version]
+move = "1.9.0" 
