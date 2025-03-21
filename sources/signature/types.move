@@ -1,10 +1,13 @@
 module keyless::types {
+    friend keyless::validator;
+    
     use std::vector;
-    use sui::object::{Self, UID};
+    use sui::object::{Self, ID, UID};
     use sui::tx_context::TxContext;
+    use sui::transfer;
     use sui::event;
+    use sui::clock::{Self, Clock};
     use keyless::bls::{G1Point, G2Point};
-    use sui::clock;
     
     /// Signature share from a validator
     struct SignatureShare has store {
@@ -47,6 +50,7 @@ module keyless::types {
     }
 
     /// Events for pairing
+    #[allow(unused_field)]
     struct PairingCreated has copy, drop {
         dapp_id: ID,
         is_anonymous: bool,
@@ -54,6 +58,7 @@ module keyless::types {
         timestamp: u64
     }
 
+    #[allow(unused_field)]
     struct PairingFinalized has copy, drop {
         pairing_id: ID,
         wallet_name: vector<u8>,
@@ -73,6 +78,7 @@ module keyless::types {
     }
 
     /// Message types for secured envelopes
+    #[allow(unused_field)]
     struct MessageMetadata has store {
         sequence: u64,
         timestamp: u64,
@@ -138,16 +144,19 @@ module keyless::types {
         encrypted_msg: vector<u8>,
         public_msg: vector<u8>,
         signature: vector<u8>,
-        metadata: MessageMetadata
+        sender_pubkey: vector<u8>,
+        receiver_pubkey: vector<u8>,
+        sequence: u64,
+        timestamp: u64
     ): SecuredEnvelope {
         SecuredEnvelope {
             encrypted_msg,
             public_msg,
             signature,
-            sender_pubkey: metadata.sender_pubkey,
-            receiver_pubkey: metadata.receiver_pubkey,
-            sequence: metadata.sequence,
-            timestamp: metadata.timestamp
+            sender_pubkey,
+            receiver_pubkey,
+            sequence,
+            timestamp
         }
     }
 
@@ -201,5 +210,40 @@ module keyless::types {
             envelope.receiver_pubkey,
             envelope.sequence
         )
+    }
+
+    // SecuredEnvelope için getter'lar
+    public fun get_envelope_timestamp(envelope: &SecuredEnvelope): u64 {
+        envelope.timestamp
+    }
+
+    public fun get_envelope_public_msg(envelope: &SecuredEnvelope): &vector<u8> {
+        &envelope.public_msg
+    }
+
+    public fun get_envelope_encrypted_msg(envelope: &SecuredEnvelope): &vector<u8> {
+        &envelope.encrypted_msg
+    }
+
+    public fun get_envelope_sender_pubkey(envelope: &SecuredEnvelope): &vector<u8> {
+        &envelope.sender_pubkey
+    }
+
+    public fun get_envelope_signature(envelope: &SecuredEnvelope): &vector<u8> {
+        &envelope.signature
+    }
+
+    // Pairing için getter'lar
+    public fun get_pairing_is_anonymous(pairing: &Pairing): bool {
+        pairing.is_anonymous
+    }
+
+    public fun get_pairing_id(pairing: &Pairing): &UID {
+        &pairing.id
+    }
+
+    /// Transfer a pairing to the sender
+    public(friend) fun transfer_pairing(pairing: Pairing, recipient: address) {
+        transfer::transfer(pairing, recipient);
     }
 } 

@@ -1,13 +1,11 @@
 module keyless::manager {
     use std::vector;
-    use sui::object::{Self, UID};
+    use sui::object::{Self, ID, UID};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
     use sui::event;
-    use sui::clock::Clock;
+    use sui::clock::{Self, Clock};
     
-    use keyless::types::{Self, SecuredEnvelope};
-
     /// Error codes
     const E_UNAUTHORIZED: u64 = 1;
     const E_INVALID_DEVICE: u64 = 2;

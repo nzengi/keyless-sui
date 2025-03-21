@@ -8,8 +8,6 @@ MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/s
 
 [addresses]
 keyless = "0x0"
-std = "0x1"
-sui = "0x2"
 
 [test-dependencies]
 Sui = { local = "../sui/crates/sui-framework/packages/sui-framework" }

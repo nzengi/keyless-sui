@@ -1,12 +1,12 @@
 module keyless::validator {
     use std::vector;
-    use sui::object::{Self, UID};
+    use sui::object::{Self, ID, UID};
     use sui::transfer;
-    use sui::tx_context::TxContext;
-    use sui::clock::Clock;
+    use sui::tx_context::{Self, TxContext};
+    use sui::clock::{Self, Clock};
     use sui::event;
     
-    use keyless::types::{Self, ValidatorSet, SignatureShare, Pairing, SecuredEnvelope, MessageMetadata};
+    use keyless::types::{Self, ValidatorSet, SignatureShare, Pairing, SecuredEnvelope};
     use keyless::threshold::{Self, ThresholdScheme};
     use keyless::bls::{Self, G1Point};
     
@@ -50,13 +50,6 @@ module keyless::validator {
     }
 
     /// Events for pairing
-    struct PairingCreated has copy, drop {
-        dapp_id: ID,
-        is_anonymous: bool,
-        account_count: u64,
-        timestamp: u64
-    }
-
     struct PairingFinalized has copy, drop {
         pairing_id: ID,
         wallet_name: vector<u8>,
@@ -68,14 +61,14 @@ module keyless::validator {
     public entry fun create_aggregator(
         validator_set: &ValidatorSet,
         message: vector<u8>,
-        clock: &Clock,
+        _clock: &Clock,
         ctx: &mut TxContext
     ) {
         let scheme = threshold::new_scheme(
             types::get_threshold(validator_set),
             vector::length(types::get_validators(validator_set)),
             *types::get_public_keys(validator_set),
-            clock
+            _clock
         );
 
         event::emit(AggregatorCreated {
@@ -92,7 +85,7 @@ module keyless::validator {
             completed: false
         };
 
-        transfer::share_object(aggregator);
+        transfer::transfer(aggregator, tx_context::sender(ctx));
     }
 
     /// Add a signature share to the aggregator
@@ -183,7 +176,7 @@ module keyless::validator {
             clock,
             ctx
         );
-        transfer::share_object(pairing);
+        types::transfer_pairing(pairing, tx_context::sender(ctx));
     }
 
     /// Verify a secured envelope
@@ -191,19 +184,17 @@ module keyless::validator {
         envelope: &SecuredEnvelope,
         clock: &Clock
     ): bool {
-        // Verify timestamp
         let current_time = clock::timestamp_ms(clock);
-        assert!(current_time - envelope.timestamp < 300000, 0); // 5 minutes
+        assert!(current_time - types::get_envelope_timestamp(envelope) < 300000, 0);
 
-        // Verify signature
         let msg = vector::empty();
-        vector::append(&mut msg, envelope.public_msg);
-        vector::append(&mut msg, envelope.encrypted_msg);
+        vector::append(&mut msg, *types::get_envelope_public_msg(envelope));
+        vector::append(&mut msg, *types::get_envelope_encrypted_msg(envelope));
         
         bls::verify_signature(
-            &bls::new_g2_point(envelope.sender_pubkey),
+            &bls::new_g2_point(*types::get_envelope_sender_pubkey(envelope)),
             &msg,
-            &bls::new_g1_point(envelope.signature)
+            &bls::new_g1_point(*types::get_envelope_signature(envelope))
         )
     }
 
@@ -213,13 +204,13 @@ module keyless::validator {
         wallet_name: vector<u8>,
         platform: vector<u8>,
         device_id: vector<u8>,
-        clock: &Clock,
-        ctx: &TxContext
+        _clock: &Clock,
+        _ctx: &TxContext
     ) {
-        assert!(pairing.is_anonymous, 0); // Only anonymous pairings
+        assert!(types::get_pairing_is_anonymous(pairing), 0);
         
         event::emit(PairingFinalized {
-            pairing_id: object::uid_to_inner(&pairing.id),
+            pairing_id: object::uid_to_inner(types::get_pairing_id(pairing)),
             wallet_name,
             platform,
             device_id
@@ -236,18 +227,14 @@ module keyless::validator {
         sequence: u64,
         clock: &Clock
     ): SecuredEnvelope {
-        let metadata = MessageMetadata {
-            sequence,
-            timestamp: clock::timestamp_ms(clock),
-            sender_pubkey,
-            receiver_pubkey
-        };
-        
         types::new_secured_envelope(
             encrypted_msg,
             public_msg,
             signature,
-            metadata
+            sender_pubkey,
+            receiver_pubkey,
+            sequence,
+            clock::timestamp_ms(clock)
         )
     }
 } 

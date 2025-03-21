@@ -1,12 +1,12 @@
 module keyless::request {
     use std::vector;
-    use sui::object::{Self, UID};
+    use sui::object::{Self, ID, UID};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
     use sui::event;
-    use sui::clock::Clock;
+    use sui::clock::{Self, Clock};
     
-    use keyless::types::{Self, SecuredEnvelope};
+    use keyless::types;
     use keyless::manager::{Self, Wallet};
     use keyless::registry::{Self, DApp};
 
@@ -17,14 +17,10 @@ module keyless::request {
     const E_EXPIRED: u64 = 4;
 
     /// Request types
-    const SIGN_MESSAGE: u8 = 0;
-    const SIGN_TRANSACTION: u8 = 1;
     const SIGN_AND_SUBMIT: u8 = 2;
 
     /// Request status
     const STATUS_PENDING: u8 = 0;
-    const STATUS_APPROVED: u8 = 1;
-    const STATUS_REJECTED: u8 = 2;
     const STATUS_INVALID: u8 = 3;
 
     /// Signing request object
@@ -92,7 +88,7 @@ module keyless::request {
             timestamp: clock::timestamp_ms(clock)
         });
 
-        transfer::share_object(request);
+        transfer::transfer(request, tx_context::sender(ctx));
     }
 
     /// Respond to a signing request
@@ -101,7 +97,7 @@ module keyless::request {
         wallet: &Wallet,
         status: u8,
         clock: &Clock,
-        ctx: &TxContext
+        _ctx: &TxContext
     ) {
         // Verify wallet owns the account
         assert!(vector::contains(manager::get_accounts(wallet), &request.account), E_UNAUTHORIZED);

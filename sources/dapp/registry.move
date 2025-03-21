@@ -1,15 +1,12 @@
 module keyless::registry {
-    use std::vector;
-    use sui::object::{Self, UID};
+    use sui::object::{Self, ID, UID};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
     use sui::event;
-    use sui::clock::Clock;
+    use sui::clock::{Self, Clock};
     
     /// Error codes
     const E_UNAUTHORIZED: u64 = 1;
-    const E_INVALID_DOMAIN: u64 = 2;
-    const E_ALREADY_REGISTERED: u64 = 3;
 
     /// Registered dApp information
     struct DApp has key {
