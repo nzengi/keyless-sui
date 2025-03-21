@@ -6,7 +6,7 @@ module keyless::validator {
     use sui::clock::Clock;
     use sui::event;
     
-    use keyless::types::{Self, ValidatorSet, SignatureShare};
+    use keyless::types::{Self, ValidatorSet, SignatureShare, Pairing, SecuredEnvelope, MessageMetadata};
     use keyless::threshold::{Self, ThresholdScheme};
     use keyless::bls::{Self, G1Point};
     
@@ -47,6 +47,21 @@ module keyless::validator {
     struct SignatureCompleted has copy, drop {
         total_shares: u64,
         verification_result: bool
+    }
+
+    /// Events for pairing
+    struct PairingCreated has copy, drop {
+        dapp_id: ID,
+        is_anonymous: bool,
+        account_count: u64,
+        timestamp: u64
+    }
+
+    struct PairingFinalized has copy, drop {
+        pairing_id: ID,
+        wallet_name: vector<u8>,
+        platform: vector<u8>,
+        device_id: vector<u8>
     }
 
     /// Create a new signature aggregator
@@ -148,6 +163,91 @@ module keyless::validator {
         types::create_share(
             index,
             bls::create_g1_point(value)
+        )
+    }
+
+    /// Create a pairing between dApp and wallet
+    public entry fun create_pairing(
+        dapp_pubkey: vector<u8>,
+        wallet_pubkey: vector<u8>,
+        accounts: vector<address>,
+        is_anonymous: bool,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let pairing = types::new_pairing(
+            dapp_pubkey,
+            wallet_pubkey, 
+            accounts,
+            is_anonymous,
+            clock,
+            ctx
+        );
+        transfer::share_object(pairing);
+    }
+
+    /// Verify a secured envelope
+    public fun verify_envelope(
+        envelope: &SecuredEnvelope,
+        clock: &Clock
+    ): bool {
+        // Verify timestamp
+        let current_time = clock::timestamp_ms(clock);
+        assert!(current_time - envelope.timestamp < 300000, 0); // 5 minutes
+
+        // Verify signature
+        let msg = vector::empty();
+        vector::append(&mut msg, envelope.public_msg);
+        vector::append(&mut msg, envelope.encrypted_msg);
+        
+        bls::verify_signature(
+            &bls::new_g2_point(envelope.sender_pubkey),
+            &msg,
+            &bls::new_g1_point(envelope.signature)
+        )
+    }
+
+    /// Finalize an anonymous pairing
+    public entry fun finalize_anonymous_pairing(
+        pairing: &mut Pairing,
+        wallet_name: vector<u8>,
+        platform: vector<u8>,
+        device_id: vector<u8>,
+        clock: &Clock,
+        ctx: &TxContext
+    ) {
+        assert!(pairing.is_anonymous, 0); // Only anonymous pairings
+        
+        event::emit(PairingFinalized {
+            pairing_id: object::uid_to_inner(&pairing.id),
+            wallet_name,
+            platform,
+            device_id
+        });
+    }
+
+    /// Create a secured envelope
+    public fun create_envelope(
+        encrypted_msg: vector<u8>,
+        public_msg: vector<u8>,
+        signature: vector<u8>,
+        sender_pubkey: vector<u8>,
+        receiver_pubkey: vector<u8>,
+        sequence: u64,
+        clock: &Clock
+    ): SecuredEnvelope {
+        let metadata = MessageMetadata {
+            sequence,
+            timestamp: clock::timestamp_ms(clock),
+            sender_pubkey,
+            receiver_pubkey
+        };
+        
+        types::new_secured_envelope(
+            encrypted_msg,
+            public_msg,
+            signature,
+            metadata
         )
     }
 } 

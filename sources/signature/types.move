@@ -4,6 +4,7 @@ module keyless::types {
     use sui::tx_context::TxContext;
     use sui::event;
     use keyless::bls::{G1Point, G2Point};
+    use sui::clock;
     
     /// Signature share from a validator
     struct SignatureShare has store {
@@ -33,6 +34,50 @@ module keyless::types {
         threshold: u64,
         /// Whether the set is properly configured
         is_valid: bool
+    }
+
+    /// Pairing between dApp and wallet
+    struct Pairing has key {
+        id: UID,
+        dapp_pubkey: vector<u8>,
+        wallet_pubkey: vector<u8>,
+        accounts: vector<address>,
+        created_at: u64,
+        is_anonymous: bool
+    }
+
+    /// Events for pairing
+    struct PairingCreated has copy, drop {
+        dapp_id: ID,
+        is_anonymous: bool,
+        account_count: u64,
+        timestamp: u64
+    }
+
+    struct PairingFinalized has copy, drop {
+        pairing_id: ID,
+        wallet_name: vector<u8>,
+        platform: vector<u8>,
+        device_id: vector<u8>
+    }
+
+    /// Secured envelope for message passing
+    struct SecuredEnvelope has store {
+        encrypted_msg: vector<u8>,
+        public_msg: vector<u8>,
+        signature: vector<u8>,
+        sender_pubkey: vector<u8>,
+        receiver_pubkey: vector<u8>,
+        sequence: u64,
+        timestamp: u64
+    }
+
+    /// Message types for secured envelopes
+    struct MessageMetadata has store {
+        sequence: u64,
+        timestamp: u64,
+        sender_pubkey: vector<u8>,
+        receiver_pubkey: vector<u8>
     }
 
     /// Create a new validator set
@@ -69,6 +114,43 @@ module keyless::types {
         }
     }
 
+    /// Create a new pairing
+    public fun new_pairing(
+        dapp_pubkey: vector<u8>,
+        wallet_pubkey: vector<u8>,
+        accounts: vector<address>,
+        is_anonymous: bool,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ): Pairing {
+        Pairing {
+            id: object::new(ctx),
+            dapp_pubkey,
+            wallet_pubkey,
+            accounts,
+            created_at: clock::timestamp_ms(clock),
+            is_anonymous
+        }
+    }
+
+    /// Create a new secured envelope
+    public fun new_secured_envelope(
+        encrypted_msg: vector<u8>,
+        public_msg: vector<u8>,
+        signature: vector<u8>,
+        metadata: MessageMetadata
+    ): SecuredEnvelope {
+        SecuredEnvelope {
+            encrypted_msg,
+            public_msg,
+            signature,
+            sender_pubkey: metadata.sender_pubkey,
+            receiver_pubkey: metadata.receiver_pubkey,
+            sequence: metadata.sequence,
+            timestamp: metadata.timestamp
+        }
+    }
+
     // Getter functions
     public fun get_threshold(set: &ValidatorSet): u64 { 
         set.threshold 
@@ -100,5 +182,24 @@ module keyless::types {
         threshold > 0 && 
         threshold <= validator_count &&
         validator_count == vector::length(public_keys)
+    }
+
+    /// Get pairing info
+    public fun get_pairing_info(pairing: &Pairing): (vector<u8>, vector<u8>, vector<address>, bool) {
+        (
+            pairing.dapp_pubkey,
+            pairing.wallet_pubkey,
+            pairing.accounts,
+            pairing.is_anonymous
+        )
+    }
+
+    /// Get envelope info
+    public fun get_envelope_info(envelope: &SecuredEnvelope): (vector<u8>, vector<u8>, u64) {
+        (
+            envelope.sender_pubkey,
+            envelope.receiver_pubkey,
+            envelope.sequence
+        )
     }
 } 
